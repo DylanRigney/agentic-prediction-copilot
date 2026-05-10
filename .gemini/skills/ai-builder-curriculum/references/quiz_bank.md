@@ -1,0 +1,5 @@
+# Quiz Bank (Active Recall)
+- **Concept:** Web Servers vs. Frameworks. (Question: What is the role of Uvicorn vs. FastAPI?)
+- **Concept:** Git Security. (Question: Why do we use glob patterns in .gitignore for .env files?)
+- **Concept:** TypedDict. (Question: Why use a TypedDict for an AI agent's state instead of a regular dictionary?)
+- **Concept:** Annotated[List, add_messages]. (Question: What happens to the message list if we DON'T use add_messages in LangGraph?)
