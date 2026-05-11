@@ -1,7 +1,7 @@
 import asyncio
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
-from config import settings
+from .config import settings
 
 app = FastAPI(title="Agentic Prediction Copilot")
 
