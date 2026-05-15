@@ -20,7 +20,7 @@ builder.add_node("oracle", call_model)
 builder.set_entry_point("oracle")
 builder.add_edge("oracle", END)
 
-graph = builder.compile() 
+# Exporting the builder  to be compiled in main.py
 
 
 
