@@ -1,0 +1,6 @@
+{
+    "python.defaultInterpreterPath": "/home/dylan/development/agentic-prediction-copilot/backend/.venv/bin/python",
+    "python.analysis.extraPaths": ["./backend"],
+    "python.languageServer": "Default",
+    "python.terminal.activateEnvInSelectedTerminal": true
+}

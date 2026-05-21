@@ -9,12 +9,11 @@ __pycache__/
 
 # Databases
 *.sqlite
+*.sqlite-*
 *.db
 
 # OS
 .DS_Store
 
-# Private Project Context
-GEMINI.md
-MEMORY.md
-RECALL_LOG.md
+# Private AI Context
+.ai/
