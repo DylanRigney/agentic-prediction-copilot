@@ -7,6 +7,7 @@ from .config import settings
 from contextlib  import asynccontextmanager
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from .agent import builder
+from fastapi.middleware.cors import CORSMiddleware
 
 graph = None
 
@@ -33,6 +34,15 @@ async def generator_chat_stream(request: ChatRequest):
         
 
 app = FastAPI(title="Agentic Prediction Copilot", lifespan=lifespan)
+
+# Allow the front end to talk to the backend with CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
