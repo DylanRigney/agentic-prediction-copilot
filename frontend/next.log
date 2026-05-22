@@ -1,0 +1,28 @@
+nohup: ignoring input
+
+> frontend@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://10.255.255.254:3000
+✓ Ready in 402ms
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+
+  Using external babel configuration from /home/dylan/development/agentic-prediction-copilot/frontend/.babelrc
+⚠ It looks like there is a custom Babel configuration that can be removed.
+ HEAD / 200 in 3.1s (next.js: 3.0s, application-code: 154ms)
+ GET / 200 in 77ms (next.js: 7ms, application-code: 70ms)
+[browser] ObjectMultiplex - orphaned data for stream "metamask-multichain-provider" (http://localhost:3000/:1:67894)
+[browser] ObjectMultiplex - orphaned data for stream "metamask-multichain-provider" (http://localhost:3000/:1:67894)
+✓ Compiled in 201ms
+ GET / 200 in 250ms (next.js: 163ms, application-code: 87ms)
+ GET / 200 in 380ms (next.js: 348ms, application-code: 32ms)
+ GET / 200 in 22ms (next.js: 2ms, application-code: 20ms)
+ GET / 200 in 24ms (next.js: 3ms, application-code: 21ms)
+ GET / 200 in 25ms (next.js: 3ms, application-code: 22ms)
+ GET / 200 in 20ms (next.js: 2ms, application-code: 18ms)
