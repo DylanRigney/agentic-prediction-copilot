@@ -3,6 +3,7 @@ import json
 from pydantic import BaseModel
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
+from fastapi.encoders import jsonable_encoder
 from .config import settings
 from contextlib  import asynccontextmanager
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
@@ -29,7 +30,8 @@ async def generator_chat_stream(request: ChatRequest):
     config = {"configurable": {"thread_id": request.thread_id}}
     
     async for chunk in graph.astream(inputs, config=config): # type: ignore
-        data = json.dumps(chunk)
+        encoded = jsonable_encoder(chunk)
+        data = json.dumps(encoded)
         yield f"data: {data}\n\n"
         
 
