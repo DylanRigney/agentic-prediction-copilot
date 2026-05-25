@@ -1,8 +1,15 @@
 from langgraph.graph import StateGraph, END
-from langchain_openai import ChatOpenAI
+from langgraph.prebuilt import ToolNode, tools_condition
 from .config import settings
 from .state import PredictionState
 from langchain_core.messages import SystemMessage
+from langchain_core.tools import tool
+from langchain_openai import ChatOpenAI
+from tavily import TavilyClient
+
+tavily_client = TavilyClient(api_key=settings.TAVILY_API_KEY)
+
+
 
 
 model = ChatOpenAI(
@@ -30,22 +37,55 @@ Core Directives:
 - **CRITICAL UI TRIGGER**: At the very end of your message in Phase 2, you MUST output this exact string on its own line:
 [UI_TRIGGER: PROBABILITY_SLIDER]
 
+**[CURRENT_PHASE: 3] - Web Research & Analysis**
+- Once the user provides their Thesis and Baseline Probability, you MUST perform web research.
+- **CRITICAL UI TRIGGER**: When starting your research, output this exact string on its own line:
+[UI_TRIGGER: RESEARCHING]
+- Use the `search_web` tool to search for base rates, relevant historical data, current events, and trends.
+- **CRITICAL RULE**: Do NOT rely on your internal training data for facts or current events. You are prone to hallucinating outdated information (e.g., from 2024). ALWAYS use the `search_web` tool to find the most up-to-date reality before making claims.
+- Based on your findings, formulate a structured argument comparing the user's thesis with the research data.
+
+**[CURRENT_PHASE: 4] - Final Verdict**
+- After completing your research, present your final forecast.
+- Assign an exact **Final Probability** (0-100%) to the prediction.
+- **CRITICAL UI TRIGGER**: At the very end of your final forecast message, you MUST output this exact string on its own line:
+[UI_TRIGGER: FINAL_VERDICT]
+
 **Workflow Rules:**
-- Do NOT calculate your own probability yet. Wait for the user to provide their baseline thesis and probability.
+- Do NOT calculate your own probability until Phase 4.
 - Always use clean Markdown for your output.
 """
+
+@tool
+def search_web(query:str) -> str:
+    """Search the web for current events, facts, or data to validate prediction claims. 
+    Use this to find real-time info. CRITICAL: Do not assume facts from your training data, use this tool to verify reality."""
+    response = tavily_client.search(query=query, max_results=3)
+    results = []
+    for r in response.get("results", []):
+        results.append(f"Title: {r.get('title')}\nURL: {r.get('url')}\nContent: {r.get('content')}\n---")    
+    return "\n".join(results)
+
+tools = [search_web]
+tool_node = ToolNode(tools)
+model_with_tools = model.bind_tools(tools)
+
 
 def call_model(state: PredictionState): 
     messages = state["messages"]
     system_message = SystemMessage(content=SYSTEM_PROMPT)
     full_messages = [system_message] + messages
-    response = model.invoke(full_messages)
+    response = model_with_tools.invoke(full_messages)
     return {"messages": [response]}
 
 builder = StateGraph(PredictionState)  # pyrefly: ignore
 builder.add_node("oracle", call_model)
+builder.add_node("tools", tool_node)
+
 builder.set_entry_point("oracle")
-builder.add_edge("oracle", END)
+
+builder.add_conditional_edges("oracle", tools_condition)
+builder.add_edge("tools", "oracle")
 
 # Exporting the builder  to be compiled in main.py
 
