@@ -9,12 +9,18 @@ from contextlib  import asynccontextmanager
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from .agent import builder
 from fastapi.middleware.cors import CORSMiddleware
+from sqlmodel import SQLModel, Session, select
+from fastapi import Depends
+from .database import engine, get_session
+from .models import Prediction
 
 graph = None
 
 @asynccontextmanager
 async def lifespan(app:FastAPI):
     global graph
+
+    SQLModel.metadata.create_all(engine)
 
     async with AsyncSqliteSaver.from_conn_string("checkpoints.sqlite") as saver:
         await saver.setup()
@@ -53,6 +59,25 @@ async def chat(request: ChatRequest):
         media_type="text/event-stream"
     )
     
+@app.post("/api/history", response_model=Prediction)
+def save_prediction(prediction: Prediction, session: Session = Depends(get_session)):
+    session.add(prediction)
+    session.commit()
+    session.refresh(prediction)
+    return prediction
+
+@app.get("/api/history", response_model=list[Prediction])
+def get_history(session: Session = Depends(get_session)):
+    predictions = session.exec(select(Prediction).order_by(Prediction.created_at.desc())).all()
+    return predictions
+
+@app.delete("/api/history/{prediction_id}")
+def delete_prediction(prediction_id: int, session: Session = Depends(get_session)):
+    prediction = session.get(Prediction, prediction_id)
+    if prediction:
+        session.delete(prediction)
+        session.commit()
+    return {"status": "deleted"}
 
 @app.get("/health")
 def health_check():
