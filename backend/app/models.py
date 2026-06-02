@@ -7,7 +7,7 @@ class Prediction(SQLModel, table=True):
     thread_id: str = Field(index=True)
 
     # Core Prediction Data
-    topic: str
+    question: str
     category: Optional[str] = None 
     thesis: str
 

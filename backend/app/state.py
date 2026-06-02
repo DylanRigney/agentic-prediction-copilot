@@ -6,7 +6,7 @@ class PredictionState(TypedDict):
     messages: Annotated[list, add_messages]
     
     # 1. The "Verifiable Prediction" Data
-    topic: NotRequired[Optional[str]]               # Raw user intent
+    question: NotRequired[Optional[str]]               # Raw user intent
     refined_question: NotRequired[Optional[str]]    # The S.M.A.R.T version
     resolution_criteria: NotRequired[Optional[str]] # Exactly how we judge 'Success'
     target_date: NotRequired[Optional[str]]         # When does this prediction resolve?
