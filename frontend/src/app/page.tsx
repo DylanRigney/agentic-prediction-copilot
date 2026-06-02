@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import styles from "./page.module.css";
 import { Content } from "next/font/google";
@@ -10,6 +10,17 @@ export default function Home() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [threadId, setThreadId] = useState("");
+  const [questionText, setQuestionText] = useState("");
+  const [thesisText, setThesisText] = useState("")
+  const [ baselineProbability, setBaselineProbability]  = useState(50);
+  const [sliderValue, setSliderValue] = useState(50)
+  const [hasSaved, setHasSaved] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "success" | "error">("idle")
+
+  useEffect(() => {
+    setThreadId(`thread_${Math.random().toString(36).substring(2, 11)}`);
+  }, [])
 
   const handleSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -23,12 +34,20 @@ export default function Home() {
     const userMsg = { role: "user", content: messageText };
     setMessages((prev) => [...prev, userMsg]);
 
+    const userMsgCount = messages.filter(m => m.role === "user").length;
+    if (userMsgCount === 0) {
+      setQuestionText(messageText); // The very first message is their raw question
+    } else if (userMsgCount === 1) {
+      setThesisText(messageText);   // The second message is their thesis
+      setBaselineProbability(sliderValue); // Lock in the baseline probability from the slider
+    }
+
     try {
       const response = await fetch("http://localhost:8000/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          thread_id: "demo-thread-1",
+          thread_id: threadId || "demo-thread-1",
           message: messageText
         })
       });
@@ -41,6 +60,7 @@ export default function Home() {
       setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
       let buffer = "";
+      let finalAssistantContent = ""
 
       while (true) {
         const { value, done } = await reader.read();
@@ -60,6 +80,7 @@ export default function Home() {
               if (parsed.oracle && parsed.oracle.messages) {
                 const newMsgs = parsed.oracle.messages;
                 const assistantContent = newMsgs[newMsgs.length - 1].content;
+                finalAssistantContent = assistantContent;
 
                 setMessages((prev) => {
                   const next = [...prev];
@@ -74,12 +95,77 @@ export default function Home() {
           }
         }
       }
+
+      if (finalAssistantContent) {
+        let parsedAiProb = 50;
+        
+        if (finalAssistantContent.includes("[HIDDEN_AI_PROBABILITY: ")) {
+           const rightSide = finalAssistantContent.split("[HIDDEN_AI_PROBABILITY: ")[1];
+           const numberString = rightSide.split("]")[0];
+           parsedAiProb = parseInt(numberString);
+        }
+        if (finalAssistantContent.includes("[UI_TRIGGER: FINAL_VERDICT]")) {
+          // Trigger the auto-save!
+          triggerAutoSave(finalAssistantContent, parsedAiProb); 
+        }
+      }
     } catch (error) {
       console.error("Error fetching stream:", error);
     } finally {
       setIsLoading(false);
     }
   };
+
+  const triggerAutoSave = async (assistantText: string, aiProb: number) => {
+    if (hasSaved) return; // Prevent double saving
+    setHasSaved(true);
+    setSaveStatus("saving");
+
+    // We use our simple string splitting to extract the LLM's structured data
+    let resolvedQuestion = "Vague Prediction";
+    if (assistantText.includes("[FINAL_QUESTION: ")) {
+      resolvedQuestion = assistantText.split("[FINAL_QUESTION: ")[1].split("]")[0];
+    }
+
+    let resolvedThesis = "Thesis details.";
+    if (assistantText.includes("[FINAL_THESIS: ")) {
+      resolvedThesis = assistantText.split("[FINAL_THESIS: ")[1].split("]")[0];
+    }
+
+    let targetDate = "2030-12-31"; 
+    if (assistantText.includes("[FINAL_DATE: ")) {
+      targetDate = assistantText.split("[FINAL_DATE: ")[1].split("]")[0];
+    }
+
+    const payload = {
+      thread_id: threadId,
+      question: resolvedQuestion,
+      category: "General", 
+      thesis: resolvedThesis,
+      baseline_probability: baselineProbability,
+      ai_final_probability: aiProb,
+      user_final_probability: sliderValue, // The slider's value at final verdict is the final user estimate
+      target_date: targetDate,
+      status: "Active"
+    };
+
+    try {
+      const res = await fetch("http://localhost:8000/api/history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        setSaveStatus("success");
+      } else {
+        setSaveStatus("error");
+      }
+    } catch (err) {
+      setSaveStatus("error");
+    }
+  };
+
 
   return (
     // Main container
@@ -111,7 +197,32 @@ export default function Home() {
             ) : (
               messages.map((msg, index) => {
                 const hasSlider = msg.content.includes("[UI_TRIGGER: PROBABILITY_SLIDER]");
-                const cleanContent = msg.content.replace("[UI_TRIGGER: PROBABILITY_SLIDER]", "");
+                const isResearching = msg.content.includes("[UI_TRIGGER: RESEARCHING]");
+                const isFinal = msg.content.includes("[UI_TRIGGER: FINAL_VERDICT]");
+                
+                let cleanContent = msg.content
+                  .replace("[UI_TRIGGER: PROBABILITY_SLIDER]", "")
+                  .replace("[UI_TRIGGER: RESEARCHING]", "")
+                  .replace("[UI_TRIGGER: FINAL_VERDICT]", "");
+                  
+                // Clean the dynamic tags
+                if (cleanContent.includes("[HIDDEN_AI_PROBABILITY: ")) {
+                  const num = cleanContent.split("[HIDDEN_AI_PROBABILITY: ")[1].split("]")[0];
+                  cleanContent = cleanContent.replace(`[HIDDEN_AI_PROBABILITY: ${num}]`, "");
+                }
+                if (cleanContent.includes("[FINAL_QUESTION: ")) {
+                  const q = cleanContent.split("[FINAL_QUESTION: ")[1].split("]")[0];
+                  cleanContent = cleanContent.replace(`[FINAL_QUESTION: ${q}]`, "");
+                }
+                if (cleanContent.includes("[FINAL_THESIS: ")) {
+                  const t = cleanContent.split("[FINAL_THESIS: ")[1].split("]")[0];
+                  cleanContent = cleanContent.replace(`[FINAL_THESIS: ${t}]`, "");
+                }
+                if (cleanContent.includes("[FINAL_DATE: ")) {
+                  const d = cleanContent.split("[FINAL_DATE: ")[1].split("]")[0];
+                  cleanContent = cleanContent.replace(`[FINAL_DATE: ${d}]`, "");
+                }
+                cleanContent = cleanContent.trim();
 
                 return (
                   <div
@@ -127,18 +238,72 @@ export default function Home() {
                     <div style={{ marginTop: "0.5rem", whiteSpace: "pre-wrap", lineHeight: "1.5" }}>
                       <ReactMarkdown>{cleanContent}</ReactMarkdown>
                       {hasSlider && (
-                        <div style={{ marginTop: "1rem", padding: "1rem", backgroundColor: "#333", borderRadius: "8px" }}>
-                          <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "bold", color: "#fff" }}>
-                            Set Your Baseline Probability
-                          </label>
-                          <input type="range" min="0" max="100" defaultValue="50" style={{ width: "100%", cursor: "pointer" }} />
-                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", color: " #aaa", marginTop: "0.5rem" }}>
-                            <span>0%</span>
-                            <span>50%</span>
-                            <span>100%</span>
-                          </div>
-                        </div>
-                      )}
+  <div style={{ 
+    marginTop: "1.5rem", 
+    padding: "1.5rem", 
+    backgroundColor: "#1a1a2e", 
+    borderRadius: "12px", 
+    border: "1px solid #2a2a4a",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
+  }}>
+    {/* Widget Header */}
+    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem" }}>
+      <span style={{ fontSize: "1.2rem" }}>📊</span>
+      <h4 style={{ margin: 0, color: "#0070f3", textTransform: "uppercase", letterSpacing: "1px", fontSize: "0.85rem" }}>
+        Assessment Required
+      </h4>
+    </div>
+
+    {/* Label & Sleek Number Input */}
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+      <label style={{ fontWeight: "500", color: "#e0e0e0", fontSize: "0.95rem" }}>
+        Set your baseline probability
+      </label>
+      <div style={{ 
+        display: "flex", alignItems: "center", gap: "0.25rem", 
+        backgroundColor: "#0f0f1a", padding: "0.25rem 0.5rem", 
+        borderRadius: "6px", border: "1px solid #2a2a4a" 
+      }}>
+        <input
+          type="number"
+          min="0" max="100"
+          value={sliderValue}
+          onChange={(e) => {
+            const val = Math.max(0, Math.min(100, parseInt(e.target.value) || 0));
+            setSliderValue(val);
+          }}
+          style={{
+            width: "45px", backgroundColor: "transparent", border: "none",
+            color: "#0070f3", fontWeight: "bold", fontSize: "1.1rem",
+            textAlign: "right", outline: "none"
+          }}
+        />
+        <span style={{ color: "#aaa", fontSize: "1rem", fontWeight: "bold" }}>%</span>
+      </div>
+    </div>
+
+    {/* The Slider itself */}
+    <input 
+      type="range" 
+      min="0" max="100" 
+      value={sliderValue}
+      onChange={(e) => setSliderValue(parseInt(e.target.value))}
+      style={{ width: "100%", cursor: "pointer", accentColor: "#0070f3", height: "6px" }} 
+    />
+
+    {/* Tick marks/Labels */}
+    <div style={{ 
+      display: "flex", justifyContent: "space-between", 
+      fontSize: "0.75rem", color: "#666", marginTop: "0.75rem", 
+      fontWeight: "bold", textTransform: "uppercase" 
+    }}>
+      <span>Impossible (0%)</span>
+      <span>Even Odds (50%)</span>
+      <span>Certain (100%)</span>
+    </div>
+  </div>
+)}
+
                     </div>
                   </div>
                 )
