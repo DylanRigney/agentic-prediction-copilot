@@ -1,7 +1,7 @@
 import asyncio
 import json
 from pydantic import BaseModel
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi.encoders import jsonable_encoder
 from .config import settings
@@ -10,7 +10,6 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from .agent import builder
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import SQLModel, Session, select
-from fastapi import Depends
 from .database import engine, get_session
 from .models import Prediction
 
@@ -70,6 +69,14 @@ def save_prediction(prediction: Prediction, session: Session = Depends(get_sessi
 def get_history(session: Session = Depends(get_session)):
     predictions = session.exec(select(Prediction).order_by(Prediction.created_at.desc())).all()
     return predictions
+
+@app.get("/api/history/{prediction_id}", response_model=Prediction)
+def get_prediction(prediction_id: int, session: Session = Depends(get_session)):
+    prediction = session.get(Prediction, prediction_id)
+    if prediction:
+        return prediction
+    else: 
+        raise HTTPException(status_code=404, detail="Prediction not found")
 
 @app.delete("/api/history/{prediction_id}")
 def delete_prediction(prediction_id: int, session: Session = Depends(get_session)):
