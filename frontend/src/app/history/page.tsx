@@ -53,16 +53,22 @@ export default function HistoryPage() {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "1.5rem" }}>
                     
                     {history.map((record) => (
-                        <div key={record.id} style={{
-                            backgroundColor: "rgba(255, 255, 255, 0.03)",
-                            backdropFilter: "blur(10px)",
-                            border: "1px solid rgba(255, 255, 255, 0.1)",
-                            borderRadius: "12px",
-                            padding: "1.5rem",
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "1rem"
-                        }}>
+                        <Link
+                            href={`/history/${record.id}`}
+                            key={record.id}
+                            style={{ textDecoration: "none", color: "inherit" }}
+                        >   
+                            <div style={{
+                                backgroundColor: "rgba(255, 255, 255, 0.03)",
+                                backdropFilter: "blur(10px)",
+                                border: "1px solid rgba(255, 255, 255, 0.1)",
+                                borderRadius: "12px",
+                                padding: "1.5rem",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "1rem"
+                              }}>
+                        
                             <div>
                                 <span style={{ fontSize: "0.8rem", color: "#aaa", textTransform: "uppercase", letterSpacing: "1px" }}>
                                     {record.category} • {record.target_date}
@@ -87,6 +93,7 @@ export default function HistoryPage() {
                                 </div>
                             </div>
                         </div>
+                        </Link>
                     ))}
 
                 </div>
