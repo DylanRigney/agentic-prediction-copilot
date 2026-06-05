@@ -1,5 +1,7 @@
 "use client"
 
+import { useAuth } from "@clerk/nextjs"
+
 import React, {useState, useEffect, use} from "react";
 import Link from "next/link";
 
@@ -19,11 +21,17 @@ interface PredictionRecord {
 export default function HistoryPage() {
     const [history, setHistory] = useState<PredictionRecord[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const { getToken }  = useAuth(); 
 
     useEffect(() => {
         const fetchHistory = async () => {
             try {
-                const res = await fetch("http://localhost:8000/api/history");
+                const token = await getToken();
+                const res = await fetch("http://localhost:8000/api/history", {
+                    headers: {
+                        "Authorization": `Bearer ${token}`
+                    }
+                });
                 if (res.ok)  {
                     const predictions = await res.json()
                     setHistory(predictions);

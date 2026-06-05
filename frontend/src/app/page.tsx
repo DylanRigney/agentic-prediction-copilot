@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
+import { UserButton, useAuth } from "@clerk/nextjs";
 import styles from "./page.module.css";
 import { Content } from "next/font/google";
 
@@ -16,7 +17,9 @@ export default function Home() {
   const [ baselineProbability, setBaselineProbability]  = useState(50);
   const [sliderValue, setSliderValue] = useState(50)
   const [hasSaved, setHasSaved] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "success" | "error">("idle")
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
+  
+  const { getToken } = useAuth();
 
   useEffect(() => {
     setThreadId(`thread_${Math.random().toString(36).substring(2, 11)}`);
@@ -43,9 +46,14 @@ export default function Home() {
     }
 
     try {
+      const token = await getToken();
+
       const response = await fetch("http://localhost:8000/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json", 
+          "Authorization": `Bearer ${token}` 
+        },
         body: JSON.stringify({
           thread_id: threadId || "demo-thread-1",
           message: messageText
@@ -150,9 +158,14 @@ export default function Home() {
     };
 
     try {
+      const token = await getToken();
+
       const res = await fetch("http://localhost:8000/api/history", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+         },
         body: JSON.stringify(payload)
       });
 
@@ -172,9 +185,17 @@ export default function Home() {
     <div style={{ display: "flex", height: "100vh", backgroundColor: "#0e0e0e", color: "#fff" }}>
 
       {/* Left Sidebar */}
-      <div style={{ width: "250px", borderRight: "1px solid #333", padding: "1.5rem" }}>
-        <h3 style={{ color: "#888", fontSize: "0.9rem", textTransform: "uppercase" }}>Pipeline</h3>
-        {/* We will add steps here later */}
+       <div style={{ width: "250px", borderRight: "1px solid #333", padding: "1.5rem", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+        
+        <div>
+          <h3 style={{ color: "#888", fontSize: "0.9rem", textTransform: "uppercase" }}>Pipeline</h3>
+          {/* We will add steps here later */}
+        </div>
+        {/* User Account Button at the bottom */}
+        <div style={{ padding: "1rem", backgroundColor: "rgba(255,255,255,0.05)", borderRadius: "8px", display: "flex", alignItems: "center", gap: "1rem" }}>
+          <UserButton showName />
+          <span style={{ fontSize: "0.85rem", color: "#ccc" }}>Account</span>
+        </div>
       </div>
 
       {/* CENTER PANEL: Dashboard + Command Center (Flexible Width) */}
