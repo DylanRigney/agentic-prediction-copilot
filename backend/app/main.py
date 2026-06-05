@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import SQLModel, Session, select
 from .database import engine, get_session
 from .models import Prediction
+from .dependencies import verify_token
 
 graph = None
 
@@ -52,36 +53,38 @@ app.add_middleware(
 )
 
 @app.post("/api/chat")
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, user_id: str = Depends(verify_token)):
     return StreamingResponse(
         generator_chat_stream(request),
         media_type="text/event-stream"
     )
     
 @app.post("/api/history", response_model=Prediction)
-def save_prediction(prediction: Prediction, session: Session = Depends(get_session)):
+def save_prediction(prediction: Prediction, session: Session = Depends(get_session), user_id: str = Depends(verify_token)):
+    prediction.user_id = user_id
     session.add(prediction)
     session.commit()
     session.refresh(prediction)
     return prediction
 
 @app.get("/api/history", response_model=list[Prediction])
-def get_history(session: Session = Depends(get_session)):
-    predictions = session.exec(select(Prediction).order_by(Prediction.created_at.desc())).all()
+def get_history(session: Session = Depends(get_session), user_id: str = Depends(verify_token)):
+    predictions = session.exec(select(Prediction).where(Prediction.user_id ==
+    user_id).order_by(Prediction.created_at.desc())).all()
     return predictions
 
 @app.get("/api/history/{prediction_id}", response_model=Prediction)
-def get_prediction(prediction_id: int, session: Session = Depends(get_session)):
+def get_prediction(prediction_id: int, session: Session = Depends(get_session), user_id:str = Depends(verify_token)):
     prediction = session.get(Prediction, prediction_id)
-    if prediction:
+    if prediction and prediction.user_id == user_id:
         return prediction
     else: 
         raise HTTPException(status_code=404, detail="Prediction not found")
 
 @app.delete("/api/history/{prediction_id}")
-def delete_prediction(prediction_id: int, session: Session = Depends(get_session)):
+def delete_prediction(prediction_id: int, session: Session = Depends(get_session), user_id: str = Depends(verify_token)):
     prediction = session.get(Prediction, prediction_id)
-    if prediction:
+    if prediction and prediction.user_id == user_id:
         session.delete(prediction)
         session.commit()
     return {"status": "deleted"}
